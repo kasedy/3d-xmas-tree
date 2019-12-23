@@ -11,8 +11,8 @@
 #define START_BRIGHTNESS  60
 #define LED_TYPE    WS2812
 #define COLOR_ORDER GRB
-
-#define UPDATES_PER_SECOND 100
+#define COLOR_UPDATE_INTERVAL_MS 50
+#define ANIMATOIN_SPEED_SCALE_PERCENTAGE 5 // 5% per a unit
 
 #define BUTTON_PIN 4
 
@@ -37,9 +37,10 @@ AnimationConstructor animations[] = {
 };
 
 uint8_t currentAnimationIndex = 0;
+int8_t speedMultiplier = 0;
 
 void longPressHandler(uint8_t numClicks, Button::PressType eventType) {
-  static uint32_t lastChangeBrightness = 0;
+  static uint32_t lastTimeUpdate = 0;
   static bool lightScrollDirectionUp = true;
 
   if (numClicks == 0) {
@@ -48,10 +49,11 @@ void longPressHandler(uint8_t numClicks, Button::PressType eventType) {
       lockAnimation = true;
     } else if (eventType == Button::PRESS_FINISH) {
       lockAnimation = false;
+      lastTimeUpdate = 0;
     } else if (eventType == Button::PRESS_ONGOING) {
       uint32_t now = millis();
-      if (now - lastChangeBrightness >= 10) {
-        lastChangeBrightness = now;
+      if (now - lastTimeUpdate >= 10) {
+        lastTimeUpdate = now;
         uint8_t brightness = FastLED.getBrightness();
         uint8_t step = 1;
         if (brightness > 255 - step) {
@@ -61,6 +63,28 @@ void longPressHandler(uint8_t numClicks, Button::PressType eventType) {
         }
         FastLED.setBrightness(brightness + (lightScrollDirectionUp ? step : -step));
         FastLED.show();
+      }
+    }
+  }
+
+  static bool speedScrollDirectionUp = true;
+  if (numClicks == 1) {
+    if (eventType == Button::PRESS_START) {
+      speedScrollDirectionUp = !speedScrollDirectionUp;
+    } else if (eventType == Button::PRESS_FINISH) {
+      lastTimeUpdate = 0;
+    } else if (eventType == Button::PRESS_ONGOING) {
+      uint32_t now = millis();
+      // We will scroll from the fastest animation to slowest in 5 sec
+      if (now - lastTimeUpdate >= 25) {
+        lastTimeUpdate = now;
+        uint8_t step = 1;
+        if (speedMultiplier > 100 - step) {
+          speedScrollDirectionUp = false;
+        } else if (speedMultiplier < step - 100) { // Min Brightness = 1
+          speedScrollDirectionUp = true;
+        }
+        speedMultiplier += (speedScrollDirectionUp ? step : -step);
       }
     }
   }
@@ -88,12 +112,23 @@ void setup() {
   currentAnimation = animations[currentAnimationIndex]();
 }
 
+uint32_t linearDelayScalerUs(uint32_t defaultUpdatePeriodMs, double scaler, double percentage) {
+  if (scaler < 0) {
+    return defaultUpdatePeriodMs * (1.0 + (-scaler) * percentage / 100.0) * 1000.0;
+  }
+  if (scaler > 0) {
+    return defaultUpdatePeriodMs / (1.0 + scaler * percentage / 100.0) * 1000.0;
+  }
+  return defaultUpdatePeriodMs;
+}
+
 void loop()
 {
   static uint32_t lastAnimationTime = 0;
-
-  uint32_t now = millis();
-  if (now - lastAnimationTime >= 1000 / UPDATES_PER_SECOND && !lockAnimation) {
+  uint32_t now = micros();
+  uint32_t updateInterval = 
+      linearDelayScalerUs(COLOR_UPDATE_INTERVAL_MS, speedMultiplier, ANIMATOIN_SPEED_SCALE_PERCENTAGE);
+  if (now - lastAnimationTime >= updateInterval && !lockAnimation) {
     currentAnimation->loop();
     lastAnimationTime = now;
   }
