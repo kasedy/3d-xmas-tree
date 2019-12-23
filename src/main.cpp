@@ -11,7 +11,7 @@
 #define START_BRIGHTNESS  60
 #define LED_TYPE    WS2812
 #define COLOR_ORDER GRB
-#define COLOR_UPDATE_INTERVAL_MS 50
+#define COLOR_UPDATE_INTERVAL_US 50000
 #define ANIMATOIN_SPEED_SCALE_PERCENTAGE 5 // 5% per a unit
 
 #define BUTTON_PIN 4
@@ -112,14 +112,14 @@ void setup() {
   currentAnimation = animations[currentAnimationIndex]();
 }
 
-uint32_t linearDelayScalerUs(uint32_t defaultUpdatePeriodMs, double scaler, double percentage) {
+uint32_t linearDelayScalerUs(uint32_t defaultUpdatePeriodUs, double scaler, double percentage) {
   if (scaler < 0) {
-    return defaultUpdatePeriodMs * (1.0 + (-scaler) * percentage / 100.0) * 1000.0;
+    return defaultUpdatePeriodUs * (1.0 + (-scaler) * percentage / 100.0);
   }
   if (scaler > 0) {
-    return defaultUpdatePeriodMs / (1.0 + scaler * percentage / 100.0) * 1000.0;
+    return defaultUpdatePeriodUs / (1.0 + scaler * percentage / 100.0);
   }
-  return defaultUpdatePeriodMs;
+  return defaultUpdatePeriodUs;
 }
 
 void loop()
@@ -127,7 +127,7 @@ void loop()
   static uint32_t lastAnimationTime = 0;
   uint32_t now = micros();
   uint32_t updateInterval = 
-      linearDelayScalerUs(COLOR_UPDATE_INTERVAL_MS, speedMultiplier, ANIMATOIN_SPEED_SCALE_PERCENTAGE);
+      linearDelayScalerUs(COLOR_UPDATE_INTERVAL_US, speedMultiplier, ANIMATOIN_SPEED_SCALE_PERCENTAGE);
   if (now - lastAnimationTime >= updateInterval && !lockAnimation) {
     currentAnimation->loop();
     lastAnimationTime = now;
