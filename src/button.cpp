@@ -22,7 +22,7 @@ void Button::loop() {
   }
   isPressedLastTime = isPressed;
 
-  if (!isPressed && now - lastDownTime > DOUBLE_CLICK_TIME_THRESHOLD) {
+  if (!isPressed && now - lastDownTime > DOUBLE_CLICK_TIME_THRESHOLD && rapidClickCounter > 0) {
     onClick(rapidClickCounter);
     rapidClickCounter = 0;
   }

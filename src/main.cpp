@@ -3,6 +3,8 @@
 #include <SendOnlySoftwareSerial.h>
 
 #include "button.h"
+#include "animation.h"
+#include "helpers.h"
 
 #define LED_PIN     3
 #define NUM_LEDS    12
@@ -14,25 +16,27 @@
 
 #define BUTTON_PIN 4
 
-SendOnlySoftwareSerial serial(2);
+SendOnlySoftwareSerial debug(2);
 
 CRGB leds[NUM_LEDS];
 
-CRGBPalette16 currentPalette;
-TBlendType    currentBlending;
-
 Button button(BUTTON_PIN);
 
-uint32_t lastAnimationTime = 0;
-uint8_t ledStartIndex = 0;
 bool lockAnimation = false;
 
-void FillLEDsFromPaletteColors(uint8_t colorIndex)
-{
-  for (int i = 0; i < NUM_LEDS; ++i) {
-    leds[i] = ColorFromPalette(currentPalette, colorIndex + (255 / NUM_LEDS * i), START_BRIGHTNESS, currentBlending);
-  }
-}
+Animation *currentAnimation;
+
+typedef Animation* (*AnimationConstructor)();
+
+AnimationConstructor animations[] = {
+  [] { return new Animation(leds, NUM_LEDS, RainbowColors_p, LINEARBLEND); },
+  [] { return new Animation(leds, NUM_LEDS, RainbowStripeColors_p, NOBLEND); },
+  [] { return new Animation(leds, NUM_LEDS, RainbowStripeColors_p, LINEARBLEND); },
+  [] { return new Animation(leds, NUM_LEDS, CloudColors_p, LINEARBLEND); },
+  [] { return new Animation(leds, NUM_LEDS, PartyColors_p, LINEARBLEND); },
+};
+
+uint8_t currentAnimationIndex = 0;
 
 void longPressHandler(uint8_t numClicks, Button::PressType eventType) {
   static uint32_t lastChangeBrightness = 0;
@@ -62,26 +66,35 @@ void longPressHandler(uint8_t numClicks, Button::PressType eventType) {
   }
 }
 
+void clickHandler(uint8_t numClicks) {
+  if (numClicks == 1) {
+    currentAnimationIndex += 1;
+    if (currentAnimationIndex >= ARRAY_LEN(animations)) {
+      currentAnimationIndex = 0;
+    }
+    delete currentAnimation;
+    currentAnimation = animations[currentAnimationIndex]();
+  }
+}
+
 void setup() {
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  debug.begin(115200);
+  button.setLongPressHandler(longPressHandler);
+  button.setClickHandler(clickHandler);
 
   FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS);
   FastLED.setBrightness(START_BRIGHTNESS);
-  currentPalette = RainbowColors_p;
-  currentBlending = LINEARBLEND;
 
-  button.setLongPressHandler(longPressHandler);
-
-  serial.begin(115200);
+  currentAnimation = animations[currentAnimationIndex]();
 }
 
 void loop()
 {
+  static uint32_t lastAnimationTime = 0;
+
   uint32_t now = millis();
   if (now - lastAnimationTime >= 1000 / UPDATES_PER_SECOND && !lockAnimation) {
-    ledStartIndex += 1;
-    FillLEDsFromPaletteColors(ledStartIndex);
-    FastLED.show();
+    currentAnimation->loop();
     lastAnimationTime = now;
   }
 
