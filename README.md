@@ -6,13 +6,13 @@ A DIY 3-D christmass tree. ATtiny85 controlls light animation of 12 addressable 
 
 ## Ordering PCB
 
-TODO: add potos of PCB (foundation and tree)
+![](pcb/foundation_top.svg)
+![](pcb/foundation_bot.svg)
+
 
 ## Part list
 
 ## Assembly instructions
-
-TODO: need to make several photos. Assembled basement. Aligment maks on the tree. And led placing orientation.
 
 ## Upload Firmware
 
